@@ -31,6 +31,10 @@
     state: absent
   when: download_kibana
 
+- ansible.builtin.debug:
+    msg: "Downloading Kibana ... [be patient]"
+  when: download_kibana
+
 - name: Install | Download Kibana .deb if missing or invalid
   get_url:
     url: "https://artifacts.elastic.co/downloads/kibana/kibana-{{ kibana_stack_version }}-amd64.deb"
@@ -43,6 +47,19 @@
   become: true
   ansible.builtin.apt:
     deb: /tmp/kibana-{{ kibana_stack_version }}.deb
+
+- name: Install | Start kibana
+  become: true
+  ansible.builtin.systemd:
+    name: kibana
+    state: started
+
+- name: Install | Wait until Kibana is available
+  ansible.builtin.wait_for:
+    host: "127.0.0.1"
+    port: 5601
+    timeout: 300
+    state: started
 
 - name: Install | Copy CA certificate
   become: true
@@ -63,7 +80,7 @@
     group: kibana
   notify: Restart kibana
 
-- name: Install | Start and enable kibana
+- name: Install | Restart and enable kibana
   become: true
   ansible.builtin.systemd:
     name: kibana

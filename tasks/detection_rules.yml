@@ -1,0 +1,62 @@
+
+- name: Wait for Kibana to be up
+  ansible.builtin.uri:
+    url: http://localhost:5601/api/status
+    method: GET
+    return_content: yes
+    status_code: 200
+    force_basic_auth: yes
+    user: elastic
+    password: "{{ kibana_elastic_password }}"
+    headers:
+      kbn-xsrf: "true"
+  register: kibana_status
+  retries: 10
+  delay: 5
+  until: kibana_status.content is search('"level":"available"')
+
+- name: Config | Install prepacked rules
+  ansible.builtin.uri:
+    url: http://localhost:5601/api/detection_engine/rules/prepackaged
+    method: PUT
+    user: "elastic"
+    password: "{{ kibana_elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: true
+    status_code: [200, 409, 500] 
+    return_content: yes
+  register: install_prebuilt_rules
+  failed_when: false
+
+- name: Query installed detection rules
+  ansible.builtin.uri:
+    url: http://localhost:5601/api/detection_engine/rules/_find?page=1&per_page=10000
+    method: GET
+    return_content: yes
+    headers:
+      kbn-xsrf: "true"
+    user: elastic
+    password: "{{ kibana_elastic_password }}"
+    force_basic_auth: yes
+  register: installed_rules_response
+
+- name: Fail if the threshold of installed detection rule is not met
+  ansible.builtin.fail:
+    msg: "Fewer than {{ kibana_rule_threshold }} detection rules installed!"
+  when: (installed_rules_response.json.total | int) < kibana_rule_threshold
+
+- name: Config | Enable all non-Windows rules
+  ansible.builtin.uri:
+    url: http://localhost:5601/api/detection_engine/rules/_bulk_action
+    method: POST
+    user: "elastic"
+    password: "{{ kibana_elastic_password }}"
+    force_basic_auth: true
+    body_format: json
+    headers:
+      Content-Type: "application/json"
+      kbn-xsrf: "true"
+    body:
+      query: "not alert.attributes.tags:\"OS: Windows\""
+      action: "enable"

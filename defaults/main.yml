@@ -5,4 +5,12 @@ kibana_elasticsearch_host: https://localhost:9200
 kibana_elasticsearch_username: kibana_system
 kibana_elasticsearch_password: Mozart.R0cks!
 
+kibana_elastic_password: Mozart.R0cks!
+
 kibana_elasticsearch_http_ssl_ca: /path/to/local/ca.crt
+
+kibana_local_plugins_dir: /tmp/plugins
+kibana_plugin_bin: /usr/share/kibana/bin/kibana-plugin
+
+elasticsearch_xpack_encryptedSavedObjects_key: bdelHvMT9zdZLOdGJyWOh7RZND6vmWgI
+kibana_rule_threshold: 100

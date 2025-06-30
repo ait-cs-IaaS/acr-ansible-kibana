@@ -1,0 +1,97 @@
+---
+
+- name: Install | Download Kibana SHA512 checksum
+  ansible.builtin.get_url:
+    url: "https://artifacts.elastic.co/downloads/kibana/kibana-{{ kibana_stack_version }}-amd64.deb.sha512"
+    dest: "/tmp/kibana-{{ kibana_stack_version }}.deb.sha512"
+    mode: '0644'
+
+- name: Install | Read SHA512 checksum value
+  ansible.builtin.slurp:
+    src: "/tmp/kibana-{{ kibana_stack_version }}.deb.sha512"
+  register: kibana_sha512_file
+
+- name: Install | Extract checksum string from file
+  set_fact:
+    kibana_checksum: "{{ (kibana_sha512_file.content | b64decode).split()[0] }}"
+
+- name: Install | Check if Kibana .deb exists and is valid
+  shell: "sha512sum /tmp/kibana-{{ kibana_stack_version }}.deb | awk '{print $1}'"
+  register: local_kibana_checksum
+  failed_when: false
+  changed_when: false
+
+- name: Install | Set download_needed flag
+  set_fact:
+    download_kibana: "{{ (local_kibana_checksum.stdout | default('')) != kibana_checksum }}"
+
+- name: Install | Remove invalid kibana .deb file
+  file:
+    path: "/tmp/kibana-{{ kibana_stack_version }}.deb"
+    state: absent
+  when: download_kibana
+
+- ansible.builtin.debug:
+    msg: "Downloading Kibana ... [be patient]"
+  when: download_kibana
+
+- name: Install | Download Kibana .deb if missing or invalid
+  get_url:
+    url: "https://artifacts.elastic.co/downloads/kibana/kibana-{{ kibana_stack_version }}-amd64.deb"
+    dest: "/tmp/kibana-{{ kibana_stack_version }}.deb"
+    checksum: "sha512:{{ kibana_checksum }}"
+    mode: '0644'
+  when: download_kibana
+
+- name: Install | Install Kibana
+  become: true
+  ansible.builtin.apt:
+    deb: /tmp/kibana-{{ kibana_stack_version }}.deb
+
+- name: Install | Start kibana
+  become: true
+  ansible.builtin.systemd:
+    name: kibana
+    state: started
+  register: result
+  retries: 3
+  delay: 10
+  until: result is succeeded
+
+- name: Install | Wait until Kibana is available
+  ansible.builtin.wait_for:
+    host: "127.0.0.1"
+    port: 5601
+    timeout: 300
+    state: started
+
+- name: Install | Copy CA certificate
+  become: true
+  ansible.builtin.copy:
+    src: "{{ kibana_elasticsearch_http_ssl_ca }}"
+    dest: "/etc/kibana/{{ kibana_elasticsearch_http_ssl_ca | basename }}"
+    mode: "0600"
+    owner: kibana
+    group: kibana
+
+- name: Config | Write config
+  become: true
+  ansible.builtin.template:
+    src: kibana.yml.j2
+    dest: /etc/kibana/kibana.yml
+    mode: "0660"
+    owner: root
+    group: kibana
+  notify: Restart kibana
+
+- name: Install | Restart and enable kibana
+  become: true
+  ansible.builtin.systemd:
+    name: kibana
+    state: restarted
+    enabled: true
+    daemon_reload: true
+  register: result
+  retries: 3
+  delay: 10
+  until: result is succeeded

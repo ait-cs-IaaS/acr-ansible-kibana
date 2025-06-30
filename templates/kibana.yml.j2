@@ -84,6 +84,9 @@ elasticsearch.password: "{{ kibana_elasticsearch_password }}"
 # =================== System: Elasticsearch (Optional) ===================
 # These files are used to verify the identity of Kibana to Elasticsearch and are required when
 # xpack.security.http.ssl.client_authentication in Elasticsearch is set to required.
+
+xpack.encryptedSavedObjects.encryptionKey: "{{ elasticsearch_xpack_encryptedSavedObjects_key }}"
+
 #elasticsearch.ssl.certificate: /path/to/your/client.crt
 #elasticsearch.ssl.key: /path/to/your/client.key
 

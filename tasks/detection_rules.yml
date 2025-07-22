@@ -29,6 +29,17 @@
   register: install_prebuilt_rules
   failed_when: false
 
+- name: Delete "My First Rule" if present
+  ansible.builtin.uri:
+    url: "http://localhost:5601/api/detection_engine/rules?rule_id=my-first-rule"
+    method: DELETE
+    user: "elastic"
+    password: "{{ kibana_elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+    status_code: [200, 404]
+
 - name: Query installed detection rules
   ansible.builtin.uri:
     url: http://localhost:5601/api/detection_engine/rules/_find?page=1&per_page=10000
@@ -50,6 +61,7 @@
   ansible.builtin.uri:
     url: http://localhost:5601/api/detection_engine/rules/_bulk_action
     method: POST
+    timeout: 3600
     user: "elastic"
     password: "{{ kibana_elastic_password }}"
     force_basic_auth: true
